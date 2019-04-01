@@ -2,7 +2,6 @@ package zbxscr
 
 import (
 	"encoding/base64"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -117,9 +116,7 @@ func (s *Settings) cacheCheckActual(file string) (bool, error) {
 		if os.IsNotExist(err) == false {
 			// If the problem is not related of the file
 			// existence (e.g. permissions error)
-			if s.debugMode {
-				fmt.Printf("Can't stat cache data file: %v", err)
-			}
+			s.DebugPrint("Can't stat cache data file: %v", err)
 			return false, err
 		}
 
@@ -148,17 +145,13 @@ func (s *Settings) cacheRead(file string) (Cache, error) {
 	// Read cache data
 	d, err := ioutil.ReadFile(file)
 	if err != nil {
-		if s.debugMode {
-			fmt.Printf("Can't read cache: %v", err)
-		}
+		s.DebugPrint("Can't read cache: %v", err)
 		return c, err
 	}
 
 	// Unmarshal retrived data
 	if err := yaml.Unmarshal(d, &cio); err != nil {
-		if s.debugMode {
-			fmt.Printf("Can't parse cache: %v", err)
-		}
+		s.DebugPrint("Can't parse cache: %v", err)
 		return c, err
 	}
 
@@ -182,27 +175,21 @@ func (s *Settings) cacheWrite(name string, c Cache) error {
 		Data:          base64.StdEncoding.EncodeToString(c.Data),
 	})
 	if err != nil {
-		if s.debugMode {
-			fmt.Printf("Can't serialize cache: %v", err)
-		}
+		s.DebugPrint("Can't serialize cache: %v", err)
 		return err
 	}
 
 	// Create cache dir
 	dir := s.cacheDirPath(name)
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		if s.debugMode {
-			fmt.Printf("Can't create cache dir: %v", err)
-		}
+		s.DebugPrint("Can't create cache dir: %v", err)
 		return err
 	}
 
 	// Write cache file
 	file := s.cacheFilePath(name)
 	if err := ioutil.WriteFile(file, d, 0640); err != nil {
-		if s.debugMode {
-			fmt.Printf("Can't write cache: %v", err)
-		}
+		s.DebugPrint("Can't write cache: %v", err)
 		return err
 	}
 
