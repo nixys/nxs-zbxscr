@@ -50,7 +50,7 @@ func (s *Settings) CacheGet(name string, ctx interface{}, forceUpdate bool) Cach
 	cacheFile := s.cacheFilePath(name)
 
 	if forceUpdate == false {
-		s.DebugPrint("Checking cache actual\n")
+		s.DebugPrint("Checking whether cache actual\n")
 		actual, err := s.cacheCheckActual(cacheFile)
 		if err != nil {
 			c.InstanceAlive = false
@@ -58,7 +58,7 @@ func (s *Settings) CacheGet(name string, ctx interface{}, forceUpdate bool) Cach
 		}
 
 		if actual == true {
-			s.DebugPrint("Cache actual\n")
+			s.DebugPrint("Cache is actual\n")
 			s.DebugPrint("Reading cache\n")
 			c, err = s.cacheRead(cacheFile)
 			if err != nil {
@@ -69,7 +69,7 @@ func (s *Settings) CacheGet(name string, ctx interface{}, forceUpdate bool) Cach
 			return c
 		}
 
-		s.DebugPrint("Cache outdated\n")
+		s.DebugPrint("Cache is outdated\n")
 	}
 
 	s.DebugPrint("Calling exporter\n")

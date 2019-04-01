@@ -86,26 +86,23 @@ type discovery struct {
 // Action is package entrypoint function
 func (s *Settings) Action(action string, ctx interface{}) string {
 
-	if s.DiscoveryAction == nil ||
-		s.CheckConfAction == nil ||
-		s.CheckAliveAction == nil ||
-		s.MetricAction == nil {
-
-		s.DebugPrint("Action processing error: null one of action functions\n")
-		return MsgNotSupported
-	}
-
 	if err := s.checkGUID(); err != nil {
 		s.DebugPrint("Error while checking uid or gid for process: %v (try to use 'sudo')\n", err)
-		return MsgNotSupported
+		return fmt.Sprintf("%s: %v", MsgNotSupported, err)
 	}
 
 	switch action {
 	case "discovery":
+
+		if s.DiscoveryAction == nil {
+			s.DebugPrint("Action 'discovery' not implemented\n")
+			return fmt.Sprintf("%s: action 'discovery' not implemented", MsgNotSupported)
+		}
+
 		d, err := s.DiscoveryAction(s, ctx)
 		if err != nil {
 			s.DebugPrint("Discovery processing error: %v\n", err)
-			return MsgNotSupported
+			return fmt.Sprintf("%s: %v", MsgNotSupported, err)
 		}
 
 		r := discovery{
@@ -117,6 +114,12 @@ func (s *Settings) Action(action string, ctx interface{}) string {
 		return string(u)
 
 	case "check_conf":
+
+		if s.CheckConfAction == nil {
+			s.DebugPrint("Action 'check_conf' not implemented\n")
+			return fmt.Sprintf("%s: action 'check_conf' not implemented", MsgNotSupported)
+		}
+
 		if err := s.CheckConfAction(s, ctx); err != nil {
 			s.DebugPrint("Check config processing error: %v\n", err)
 			return checkConfFail
@@ -124,21 +127,33 @@ func (s *Settings) Action(action string, ctx interface{}) string {
 		return checkConfSuccess
 
 	case "check_alive":
+
+		if s.CheckAliveAction == nil {
+			s.DebugPrint("Action 'check_alive' not implemented\n")
+			return fmt.Sprintf("%s: action 'check_alive' not implemented", MsgNotSupported)
+		}
+
 		if r := s.CheckAliveAction(s, ctx); r == false {
 			return checkAliveFail
 		}
 		return checkAliveSuccess
 
 	case "metric":
+
+		if s.MetricAction == nil {
+			s.DebugPrint("Action 'metric' not implemented\n")
+			return fmt.Sprintf("%s: action 'metric' not implemented", MsgNotSupported)
+		}
+
 		r, err := s.MetricAction(s, ctx)
 		if err != nil {
 			s.DebugPrint("Get metric processing error: %v\n", err)
-			return MsgNotSupported
+			return fmt.Sprintf("%s: %v", MsgNotSupported, err)
 		}
 		return r
 	}
 
-	return MsgNotSupported
+	return fmt.Sprintf("%s: unknown metric", MsgNotSupported)
 }
 
 // DebugSet toggles the debug messages to stdout
