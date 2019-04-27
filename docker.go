@@ -3,12 +3,14 @@ package zbxscr
 import (
 	"context"
 	"fmt"
+	"regexp"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 )
 
 // DockerGetContainerIPs gets the IPs for specified docker container
+// `name` - is a regular expression for container search by name
 func DockerGetContainerIPs(c context.Context, name string) ([]string, error) {
 
 	var ips []string
@@ -25,7 +27,10 @@ func DockerGetContainerIPs(c context.Context, name string) ([]string, error) {
 
 	for _, container := range containers {
 		for _, cn := range container.Names {
-			if cn == "/"+name {
+
+			// Check container name for regexp match
+			// If match obtain all container IPs
+			if regexp.MustCompile(name).MatchString(cn[1:]) == true {
 				for _, n := range container.NetworkSettings.Networks {
 					if n.IPAddress != "" {
 						ips = append(ips, n.IPAddress)
