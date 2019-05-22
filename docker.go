@@ -20,6 +20,8 @@ func DockerGetContainerIPs(c context.Context, name string) ([]string, error) {
 		return nil, err
 	}
 
+	cli.NegotiateAPIVersion(c)
+
 	containers, err := cli.ContainerList(c, types.ContainerListOptions{})
 	if err != nil {
 		return nil, err
