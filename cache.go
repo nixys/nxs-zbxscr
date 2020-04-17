@@ -72,7 +72,7 @@ func (s *Settings) CacheGet(name string, ctx interface{}, forceUpdate bool) Cach
 	}
 
 	s.DebugPrint("Calling exporter\n")
-	if d, err := s.Exporter(ctx); err != nil {
+	if d, err := s.Exporter(s, ctx); err != nil {
 		s.DebugPrint("Exporter error: %v\n", err)
 		c.InstanceAlive = false
 	} else {

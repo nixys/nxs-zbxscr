@@ -18,8 +18,8 @@ type Instance struct {
 }
 
 type confOpts struct {
-	ConfRoot  string     `conf:"cache_root" conf_extraopts:"default=/tmp/nxs-zbxscr_test"`
-	ConfTTL   float64    `conf:"cache_ttl" conf_extraopts:"default=30"`
+	CacheRoot string     `conf:"cache_root" conf_extraopts:"default=/tmp/nxs-zbxscr_test"`
+	CacheTTL  float64    `conf:"cache_ttl" conf_extraopts:"default=30"`
 	User      string     `conf:"user" conf_extraopts:"default=zabbix"`
 	Group     string     `conf:"group" conf_extraopts:"default=zabbix"`
 	Instances []Instance `conf:"instances"`
@@ -124,7 +124,7 @@ func checkConfAction(s *Settings, ctx interface{}) error {
 	return ctx.(appContext).conf.err
 }
 
-func exporter(ctx interface{}) ([]byte, error) {
+func exporter(s *Settings, ctx interface{}) ([]byte, error) {
 
 	appCtx := ctx.(appContext)
 
@@ -187,8 +187,8 @@ func TestScript(t *testing.T) {
 	}
 
 	if ctx.conf.err == nil {
-		s.CacheRoot = ctx.conf.opts.ConfRoot
-		s.CacheTTL = ctx.conf.opts.ConfTTL
+		s.CacheRoot = ctx.conf.opts.CacheRoot
+		s.CacheTTL = ctx.conf.opts.CacheTTL
 		s.User = ctx.conf.opts.User
 		s.Group = ctx.conf.opts.Group
 		s.CheckGUIDDisable = true
