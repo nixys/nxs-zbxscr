@@ -48,7 +48,7 @@ type MetricFunc func(s *Settings, ctx interface{}) (string, error)
 // ExporterFunc defines the process to obtain all the needed data from monitored service.
 // Usually this function automatically called from cache process, when the cache data is outdated,
 // or from `MetricFunc` when cache disabled.
-type ExporterFunc func(s *Settings, ctx interface{}) ([]byte, error)
+type ExporterFunc func(s *Settings, ctx interface{}, c Cache) ([]byte, error)
 
 // Settings is struct to store settings
 type Settings struct {
