@@ -125,7 +125,7 @@ func (s *Settings) cacheRead(file string) (bool, Cache, error) {
 		return false, Cache{}, err
 	}
 
-	if e == false {
+	if e == false || a == false {
 		return false, Cache{}, nil
 	}
 
