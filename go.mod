@@ -17,6 +17,7 @@ require (
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/gorilla/mux v1.7.4 // indirect
+	github.com/juju/fslock v0.0.0-20160525022230-4d5c94c67b4b
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/nixys/nxs-go-conf v1.0.1
 	github.com/opencontainers/go-digest v1.0.0 // indirect

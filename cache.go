@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	fslock "github.com/juju/fslock"
 )
 
 const (
@@ -161,6 +163,14 @@ func (s *Settings) cacheWrite(name string, c Cache) error {
 
 	// Write cache file
 	file := s.cacheFilePath(name)
+
+	// Tries to lock the lock until the timeout expires
+	lock := fslock.New(file)
+	if err := lock.LockWithTimeout(time.Second * 30); err != nil {
+		return err
+	}
+	defer lock.Unlock()
+
 	if err := ioutil.WriteFile(file, d, 0640); err != nil {
 		return err
 	}
