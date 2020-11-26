@@ -166,15 +166,14 @@ func (s *Settings) cacheWrite(name string, c Cache) error {
 
 	// Tries to lock the lock until the timeout expires
 	lock := fslock.New(file)
-	err = lock.LockWithTimeout(time.Second * 30)
-	if err != nil {
+	if err := lock.LockWithTimeout(time.Second * 30); err != nil {
 		return err
 	}
+	defer lock.Unlock()
 
 	if err := ioutil.WriteFile(file, d, 0640); err != nil {
 		return err
 	}
-	defer lock.Unlock()
 
 	// Success
 	return nil
