@@ -131,6 +131,13 @@ func (s *Settings) cacheRead(file string) (bool, Cache, error) {
 		return false, Cache{}, nil
 	}
 
+	// Tries to lock the lock until the timeout expires
+	lock := fslock.New(file)
+	if err := lock.LockWithTimeout(time.Second * 30); err != nil {
+		return false, Cache{}, err
+	}
+	defer lock.Unlock()
+
 	// Read cache data
 	d, err := ioutil.ReadFile(file)
 	if err != nil {
