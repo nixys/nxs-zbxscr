@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	fslock "github.com/juju/fslock"
@@ -77,12 +77,12 @@ func (s *Settings) CacheGet(name string, ctx interface{}, forceUpdate bool) Cach
 
 // Create full cache file path string
 func (s *Settings) cacheFilePath(name string) string {
-	return strings.Join([]string{s.CacheRoot, name, cacheFileName}, "/")
+	return strings.Join([]string{s.CacheRoot, s.CacheSubRoot, name, cacheFileName}, "/")
 }
 
 // Create directory path string where cache file will be located
 func (s *Settings) cacheDirPath(name string) string {
-	return strings.Join([]string{s.CacheRoot, name}, "/")
+	return strings.Join([]string{s.CacheRoot, s.CacheSubRoot, name}, "/")
 }
 
 // cacheCheckState checks cache file state (existence and actual)
@@ -174,7 +174,7 @@ func (s *Settings) cacheWrite(name string, c Cache) error {
 		return err
 	}
 
-	if err := syscall.Chown(dir, uid, gid); err != nil {
+	if err := ChownR(s.CacheRoot, uid, gid); err != nil {
 		return err
 	}
 
@@ -194,4 +194,15 @@ func (s *Settings) cacheWrite(name string, c Cache) error {
 
 	// Success
 	return nil
+}
+
+// recursive chown for file
+func ChownR(path string, uid, gid int) error {
+	return filepath.Walk(path, func(name string, info os.FileInfo, err error) error {
+		if err == nil {
+			err = os.Chown(name, uid, gid)
+		}
+
+		return err
+	})
 }
