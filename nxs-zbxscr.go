@@ -53,8 +53,11 @@ type ExporterFunc func(s *Settings, ctx interface{}, c Cache) ([]byte, error)
 // Settings is struct to store settings
 type Settings struct {
 
-	// Directory path to save instances cache
+	// Directory path to save all cache
 	CacheRoot string
+
+	// Directory path to save instances cache
+	CacheSubRoot string
 
 	// Cache TTL in seconds
 	CacheTTL float64
