@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 
 	fslock "github.com/juju/fslock"
@@ -165,6 +166,15 @@ func (s *Settings) cacheWrite(name string, c Cache) error {
 	// Create cache dir
 	dir := s.cacheDirPath(name)
 	if err := os.MkdirAll(dir, 0750); err != nil {
+		return err
+	}
+
+	uid, gid, _, _, err := s.getGUID()
+	if err != nil {
+		return err
+	}
+
+	if err := syscall.Chown(dir, uid, gid); err != nil {
 		return err
 	}
 
