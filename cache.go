@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 
 	fslock "github.com/juju/fslock"
@@ -131,6 +132,13 @@ func (s *Settings) cacheRead(file string) (bool, Cache, error) {
 		return false, Cache{}, nil
 	}
 
+	// Tries to lock the lock until the timeout expires
+	lock := fslock.New(file)
+	if err := lock.LockWithTimeout(time.Second * 30); err != nil {
+		return false, Cache{}, err
+	}
+	defer lock.Unlock()
+
 	// Read cache data
 	d, err := ioutil.ReadFile(file)
 	if err != nil {
@@ -158,6 +166,15 @@ func (s *Settings) cacheWrite(name string, c Cache) error {
 	// Create cache dir
 	dir := s.cacheDirPath(name)
 	if err := os.MkdirAll(dir, 0750); err != nil {
+		return err
+	}
+
+	uid, gid, _, _, err := s.getGUID()
+	if err != nil {
+		return err
+	}
+
+	if err := syscall.Chown(dir, uid, gid); err != nil {
 		return err
 	}
 
