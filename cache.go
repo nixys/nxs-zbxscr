@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -77,12 +76,12 @@ func (s *Settings) CacheGet(name string, ctx interface{}, forceUpdate bool) Cach
 
 // Create full cache file path string
 func (s *Settings) cacheFilePath(name string) string {
-	return strings.Join([]string{s.CacheRoot, s.CacheSubRoot, name, cacheFileName}, "/")
+	return strings.Join([]string{s.CacheRoot, name, cacheFileName}, "/")
 }
 
 // Create directory path string where cache file will be located
 func (s *Settings) cacheDirPath(name string) string {
-	return strings.Join([]string{s.CacheRoot, s.CacheSubRoot, name}, "/")
+	return strings.Join([]string{s.CacheRoot, name}, "/")
 }
 
 // cacheCheckState checks cache file state (existence and actual)
@@ -163,18 +162,14 @@ func (s *Settings) cacheWrite(name string, c Cache) error {
 		return err
 	}
 
-	// Create cache dir
-	dir := s.cacheDirPath(name)
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		return err
-	}
-
 	uid, gid, _, _, err := s.getGUID()
 	if err != nil {
 		return err
 	}
 
-	if err := ChownR(s.CacheRoot, uid, gid); err != nil {
+	// Create cache dir
+	dir := s.cacheDirPath(name)
+	if err := MkdirAndChown(dir, uid, gid); err != nil {
 		return err
 	}
 
@@ -196,13 +191,24 @@ func (s *Settings) cacheWrite(name string, c Cache) error {
 	return nil
 }
 
-// recursive chown for file
-func ChownR(path string, uid, gid int) error {
-	return filepath.Walk(path, func(name string, info os.FileInfo, err error) error {
-		if err == nil {
-			err = os.Chown(name, uid, gid)
-		}
+// create and chown for cache dir
+func MkdirAndChown(path string, uid, gid int) error {
 
-		return err
-	})
+	chownPath := ""
+	parts := strings.Split(path, "/")
+
+	for _, d := range parts {
+		if d != "" {
+			chownPath = chownPath + "/" + d
+			if _, err := os.Stat(chownPath); os.IsNotExist(err) {
+				if err := os.Mkdir(chownPath, 0750); err != nil {
+					return err
+				}
+				if err := os.Chown(chownPath, uid, gid); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }
