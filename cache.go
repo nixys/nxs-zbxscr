@@ -169,7 +169,7 @@ func (s *Settings) cacheWrite(name string, c Cache) error {
 
 	// Create cache dir
 	dir := s.cacheDirPath(name)
-	if err := MkdirAndChown(dir, uid, gid); err != nil {
+	if err := cacheMkdirWithChown(dir, uid, gid); err != nil {
 		return err
 	}
 
@@ -191,20 +191,20 @@ func (s *Settings) cacheWrite(name string, c Cache) error {
 	return nil
 }
 
-// create and chown for cache dir
-func MkdirAndChown(path string, uid, gid int) error {
+// cacheMkdirWithChown create and chown for cache dir
+func cacheMkdirWithChown(path string, uid, gid int) error {
 
-	chownPath := ""
+	p := ""
 	parts := strings.Split(path, "/")
 
 	for _, d := range parts {
 		if d != "" {
-			chownPath = chownPath + "/" + d
-			if _, err := os.Stat(chownPath); os.IsNotExist(err) {
-				if err := os.Mkdir(chownPath, 0750); err != nil {
+			p = strings.Join([]string{p, d}, "/")
+			if _, err := os.Stat(p); os.IsNotExist(err) {
+				if err := os.Mkdir(p, 0750); err != nil {
 					return err
 				}
-				if err := os.Chown(chownPath, uid, gid); err != nil {
+				if err := os.Chown(p, uid, gid); err != nil {
 					return err
 				}
 			}
