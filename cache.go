@@ -187,6 +187,10 @@ func (s *Settings) cacheWrite(name string, c Cache) error {
 		return err
 	}
 
+	if err := os.Chown(file, uid, gid); err != nil {
+		return err
+	}
+
 	// Success
 	return nil
 }
