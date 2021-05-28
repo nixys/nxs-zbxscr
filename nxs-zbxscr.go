@@ -48,7 +48,7 @@ type MetricFunc func(s *Settings, ctx interface{}) (string, error)
 // ExporterFunc defines the process to obtain all the needed data from monitored service.
 // Usually this function automatically called from cache process, when the cache data is outdated,
 // or from `MetricFunc` when cache disabled.
-type ExporterFunc func(s *Settings, ctx interface{}) ([]byte, error)
+type ExporterFunc func(s *Settings, ctx interface{}, c Cache) ([]byte, error)
 
 // Settings is struct to store settings
 type Settings struct {
@@ -179,6 +179,24 @@ func (s *Settings) checkGUID() error {
 		return nil
 	}
 
+	uid, gid, usename, groupname, err := s.getGUID()
+	if err != nil {
+		return err
+	}
+
+	if syscall.Getuid() != uid {
+		return fmt.Errorf("'%s' user expected", usename)
+	}
+
+	if syscall.Getgid() != gid {
+		return fmt.Errorf("'%s' group expected", groupname)
+	}
+
+	return nil
+}
+
+func (s *Settings) getGUID() (int, int, string, string, error) {
+
 	// Check and set default username
 	usename := UserDefault
 	if len(s.User) > 0 {
@@ -194,24 +212,16 @@ func (s *Settings) checkGUID() error {
 	// Determine UID by specified username
 	u, err := user.Lookup(usename)
 	if err != nil {
-		return err
+		return 0, 0, "", "", err
 	}
 	uid, _ := strconv.Atoi(u.Uid)
 
 	// Determine GID by specified groupname
 	g, err := user.LookupGroup(groupname)
 	if err != nil {
-		return err
+		return 0, 0, "", "", err
 	}
 	gid, _ := strconv.Atoi(g.Gid)
 
-	if syscall.Getuid() != uid {
-		return fmt.Errorf("'%s' user expected", usename)
-	}
-
-	if syscall.Getgid() != gid {
-		return fmt.Errorf("'%s' group expected", groupname)
-	}
-
-	return nil
+	return uid, gid, usename, groupname, nil
 }

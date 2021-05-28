@@ -124,7 +124,7 @@ func checkConfAction(s *Settings, ctx interface{}) error {
 	return ctx.(appContext).conf.err
 }
 
-func exporter(s *Settings, ctx interface{}) ([]byte, error) {
+func exporter(s *Settings, ctx interface{}, c Cache) ([]byte, error) {
 
 	appCtx := ctx.(appContext)
 

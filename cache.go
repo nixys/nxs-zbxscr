@@ -1,13 +1,13 @@
 package zbxscr
 
 import (
-	"encoding/base64"
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
 
-	yaml "gopkg.in/yaml.v2"
+	fslock "github.com/juju/fslock"
 )
 
 const (
@@ -21,15 +21,10 @@ type Cache struct {
 	// This field indicates for ability to retrieve data from instance endpoint.
 	// If true  - data successfully retrieved from from cache file (if it's actual) or exeporter without any errors.
 	// If false - some errors occurs while processing data retrieve (from cache or exporter)
-	InstanceAlive bool `yaml:"instance_alive"`
+	InstanceAlive bool `json:"instance_alive"`
 
 	// This field contains data was obtained from cache (if it's actual) or exporter.
-	Data []byte `yaml:"data"`
-}
-
-type cacheIO struct {
-	InstanceAlive bool   `yaml:"instance_alive"`
-	Data          string `yaml:"data"`
+	Data []byte `json:"data"`
 }
 
 // CacheGet retrieves data either from cache file if it's actual, or from exporter if cache rotted (in this case cache will be updated)
@@ -37,45 +32,33 @@ type cacheIO struct {
 // If `forceUpdate` argument is true, cache will be force updated.
 func (s *Settings) CacheGet(name string, ctx interface{}, forceUpdate bool) Cache {
 
-	var c Cache
-
 	// Check exporter function defined
 	if s.Exporter == nil {
 		s.DebugPrint("Cache processing error: null exporter function\n")
-		c.InstanceAlive = false
+		return Cache{}
+	}
+
+	actual, c, err := s.cacheRead(s.cacheFilePath(name))
+	if err != nil {
+		s.DebugPrint("Cache read error: %s\n", err)
+		return Cache{}
+	}
+
+	// If cache exists, actual and forceUpdate is false
+	if forceUpdate == false && actual == true {
+		s.DebugPrint("Cache is actual\n")
 		return c
 	}
 
-	cacheFile := s.cacheFilePath(name)
-
-	if forceUpdate == false {
-		s.DebugPrint("Checking whether cache actual\n")
-		actual, err := s.cacheCheckActual(cacheFile)
-		if err != nil {
-			c.InstanceAlive = false
-			return c
-		}
-
-		if actual == true {
-			s.DebugPrint("Cache is actual\n")
-			s.DebugPrint("Reading cache\n")
-			c, err = s.cacheRead(cacheFile)
-			if err != nil {
-				c.InstanceAlive = false
-			} else {
-				s.DebugPrint("Data successfully retrieved from cache (InstanceAlive: %t)\n", c.InstanceAlive)
-			}
-			return c
-		}
-
-		s.DebugPrint("Cache is outdated\n")
-	}
-
+	s.DebugPrint("Cache is outdated\n")
 	s.DebugPrint("Calling exporter\n")
-	if d, err := s.Exporter(s, ctx); err != nil {
-		s.DebugPrint("Exporter error: %v\n", err)
-		c.InstanceAlive = false
+
+	if d, err := s.Exporter(s, ctx, c); err != nil {
+		// Cleanup cache struct
+		c = Cache{}
+		s.DebugPrint("Exporter error: %s\n", err)
 	} else {
+		// Fill cache struct with new data
 		c.InstanceAlive = true
 		c.Data = d
 		s.DebugPrint("Got data from exporter (InstanceAlive: %t)\n", c.InstanceAlive)
@@ -83,10 +66,11 @@ func (s *Settings) CacheGet(name string, ctx interface{}, forceUpdate bool) Cach
 
 	s.DebugPrint("Writing retrieved data to cache\n")
 	if err := s.cacheWrite(name, c); err != nil {
-		c.InstanceAlive = false
+		s.DebugPrint("Cache write error: %s\n", err)
+		return Cache{}
 	}
 
-	s.DebugPrint("Return data (InstanceAlive: %t)\n", c.InstanceAlive)
+	s.DebugPrint("Return cache data (InstanceAlive: %t)\n", c.InstanceAlive)
 	return c
 }
 
@@ -100,13 +84,13 @@ func (s *Settings) cacheDirPath(name string) string {
 	return strings.Join([]string{s.CacheRoot, name}, "/")
 }
 
-// cacheCheckActual checks cache file last modified time
-// If cache is actual true will be returned
-func (s *Settings) cacheCheckActual(file string) (bool, error) {
+// cacheCheckState checks cache file state (existence and actual)
+func (s *Settings) cacheCheckState(file string) (bool, bool, error) {
 
 	var ttl float64
 
-	if ttl = s.CacheTTL; ttl == 0 {
+	ttl = s.CacheTTL
+	if ttl == 0 {
 		ttl = cacheTTLDefault
 	}
 
@@ -116,83 +100,119 @@ func (s *Settings) cacheCheckActual(file string) (bool, error) {
 		if os.IsNotExist(err) == false {
 			// If the problem is not related of the file
 			// existence (e.g. permissions error)
-			s.DebugPrint("Can't stat cache data file: %v", err)
-			return false, err
+			return false, false, err
 		}
 
 		// Cache file not exists
-		return false, nil
+		return false, false, nil
 	}
 
 	// Check cache file last modified time
 	if time.Now().Sub(i.ModTime()).Seconds() > ttl {
-		// Cache is rotted
-		return false, nil
+		// Cache exist but rotted
+		return true, false, nil
 	}
 
-	// Cache is actual
-	return true, nil
+	// Cache exist and actual
+	return true, true, nil
 }
 
 // cacheRead reads data from cache file
-func (s *Settings) cacheRead(file string) (Cache, error) {
+func (s *Settings) cacheRead(file string) (bool, Cache, error) {
 
-	var (
-		c   Cache
-		cio cacheIO
-	)
+	var c Cache
+
+	e, a, err := s.cacheCheckState(file)
+	if err != nil {
+		return false, Cache{}, err
+	}
+
+	if e == false {
+		return false, Cache{}, nil
+	}
+
+	// Tries to lock the lock until the timeout expires
+	lock := fslock.New(file)
+	if err := lock.LockWithTimeout(time.Second * 30); err != nil {
+		return false, Cache{}, err
+	}
+	defer lock.Unlock()
 
 	// Read cache data
 	d, err := ioutil.ReadFile(file)
 	if err != nil {
-		s.DebugPrint("Can't read cache: %v", err)
-		return c, err
+		return false, Cache{}, err
 	}
 
 	// Unmarshal retrived data
-	if err := yaml.Unmarshal(d, &cio); err != nil {
-		s.DebugPrint("Can't parse cache: %v", err)
-		return c, err
-	}
-
-	c.InstanceAlive = cio.InstanceAlive
-	c.Data, err = base64.StdEncoding.DecodeString(cio.Data)
-	if err != nil {
-		s.DebugPrint("Can't decode cache data: %v\n", err)
-		return c, err
+	if err := json.Unmarshal(d, &c); err != nil {
+		return false, Cache{}, err
 	}
 
 	// Success
-	return c, nil
+	return a, c, nil
 }
 
 // cacheWrite writes cache to file
 func (s *Settings) cacheWrite(name string, c Cache) error {
 
 	// Marshal data
-	d, err := yaml.Marshal(cacheIO{
-		InstanceAlive: c.InstanceAlive,
-		Data:          base64.StdEncoding.EncodeToString(c.Data),
-	})
+	d, err := json.Marshal(c)
 	if err != nil {
-		s.DebugPrint("Can't serialize cache: %v", err)
+		return err
+	}
+
+	uid, gid, _, _, err := s.getGUID()
+	if err != nil {
 		return err
 	}
 
 	// Create cache dir
 	dir := s.cacheDirPath(name)
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		s.DebugPrint("Can't create cache dir: %v", err)
+	if err := cacheMkdirWithChown(dir, uid, gid); err != nil {
 		return err
 	}
 
 	// Write cache file
 	file := s.cacheFilePath(name)
+
+	// Tries to lock the lock until the timeout expires
+	lock := fslock.New(file)
+	if err := lock.LockWithTimeout(time.Second * 30); err != nil {
+		return err
+	}
+	defer lock.Unlock()
+
 	if err := ioutil.WriteFile(file, d, 0640); err != nil {
-		s.DebugPrint("Can't write cache: %v", err)
+		return err
+	}
+
+	if err := os.Chown(file, uid, gid); err != nil {
 		return err
 	}
 
 	// Success
+	return nil
+}
+
+// cacheMkdirWithChown create and chown for cache dir
+func cacheMkdirWithChown(path string, uid, gid int) error {
+
+	p := ""
+	parts := strings.Split(path, "/")
+
+	for _, d := range parts {
+		if d != "" {
+			p = strings.Join([]string{p, d}, "/")
+			if _, err := os.Stat(p); os.IsNotExist(err) {
+				if err := os.Mkdir(p, 0750); err != nil {
+					return err
+				}
+				if err := os.Chown(p, uid, gid); err != nil {
+					return err
+				}
+			}
+		}
+	}
 	return nil
 }
